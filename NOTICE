@@ -1,0 +1,13 @@
+pdf-squeeze
+
+This package includes GhostPDL (Ghostscript), copyright Artifex Software, Inc.,
+licensed under the GNU Affero General Public License, version 3 (see LICENSE).
+GhostPDL is also available under a commercial license from Artifex.
+
+The WebAssembly build in dist/ is built from:
+  - GhostPDL commit 51e531d5fc35b04146454a9a14dfb7adea9e4a78
+    (https://github.com/ArtifexSoftware/ghostpdl)
+  - patches/ghostpdl-qfactor.patch (changes to the pdf/ directory)
+  - scripts/build.sh (the exact build steps)
+
+The patch and the build scripts are also licensed under AGPL-3.0-or-later.

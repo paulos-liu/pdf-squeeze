@@ -1,0 +1,4 @@
+ghostpdl 51e531d5fc35b04146454a9a14dfb7adea9e4a78
+emscripten emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.13 (e13ee988ce3d87a738dd8f3661d02223308c412a)
+2440e12b85d04979d7971ddc7c6e9473fec1c5f017aa6caf41b393b8babbd000  /private/tmp/claude-502/-Users-paulos-liu-scratch/57b35cdd-3d5a-4d77-a2c4-057b2f446674/scratchpad/pdf-squeeze/dist/gpdf.wasm
+fba92f4034ee8fef902569547c5a69e8ea8fa55b629bc7a5161ca1100b7db1c1  /private/tmp/claude-502/-Users-paulos-liu-scratch/57b35cdd-3d5a-4d77-a2c4-057b2f446674/scratchpad/pdf-squeeze/dist/gpdf.mjs

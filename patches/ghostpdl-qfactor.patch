@@ -1,0 +1,130 @@
+diff --git a/pdf/ghostpdf.h b/pdf/ghostpdf.h
+index e142182..9b6dc76 100644
+--- a/pdf/ghostpdf.h
++++ b/pdf/ghostpdf.h
+@@ -158,6 +158,8 @@ typedef struct cmd_args_s {
+     bool nouserunit;
+     bool renderttnotdef;
+     bool pdfinfo;
++    int color_qfactor_pct;
++    int gray_qfactor_pct;
+     bool UsePDFX3Profile;
+     bool NOSUBSTDEVICECOLORS;
+     bool ditherppi;
+diff --git a/pdf/pdf_device.c b/pdf/pdf_device.c
+index a53e571..14fa6c1 100644
+--- a/pdf/pdf_device.c
++++ b/pdf/pdf_device.c
+@@ -121,6 +121,57 @@ int pdfi_device_set_param_float(gx_device *dev, const char *param, float value)
+     return code;
+ }
+ 
++/* Write a distiller-style image dictionary, e.g. ColorImageDict << /QFactor q ... >> */
++static int pdfi_device_write_qfactor_dict(gs_param_list *plist, const char *key, int pct)
++{
++    gs_param_dict dict;
++    float qfactor = pct / 100.0f;
++    int blend = 1;
++    int samples[4] = {1, 1, 1, 1};
++    gs_param_int_array hs, vs;
++    int code;
++
++    hs.data = samples;
++    hs.size = 4;
++    hs.persistent = false;
++    vs = hs;
++
++    code = param_begin_write_dict(plist, key, &dict, false);
++    if (code < 0)
++        return code;
++    code = param_write_float(dict.list, "QFactor", &qfactor);
++    if (code >= 0)
++        code = param_write_int(dict.list, "Blend", &blend);
++    if (code >= 0)
++        code = param_write_int_array(dict.list, "HSamples", &hs);
++    if (code >= 0)
++        code = param_write_int_array(dict.list, "VSamples", &vs);
++    param_end_write_dict(plist, key, &dict);
++    return code;
++}
++
++/* Set the JPEG QFactor for the ColorImageDict and GrayImageDict device parameters */
++int pdfi_device_set_image_qfactor(gx_device *dev, int color_pct, int gray_pct)
++{
++    int code = 0;
++    gs_c_param_list list;
++
++    gs_c_param_list_write(&list, dev->memory);
++    gs_param_list_set_persistent_keys((gs_param_list *)&list, false);
++    if (color_pct > 0)
++        code = pdfi_device_write_qfactor_dict((gs_param_list *)&list, "ColorImageDict", color_pct);
++    if (code >= 0 && gray_pct > 0)
++        code = pdfi_device_write_qfactor_dict((gs_param_list *)&list, "GrayImageDict", gray_pct);
++    if (code < 0)
++        goto exit;
++    gs_c_param_list_read(&list);
++    code = gs_putdeviceparams(dev, (gs_param_list *)&list);
++
++ exit:
++    gs_c_param_list_release(&list);
++    return code;
++}
++
+ /* Checks whether a parameter exists for the device */
+ bool pdfi_device_check_param_exists(gx_device *dev, const char *param)
+ {
+diff --git a/pdf/pdf_device.h b/pdf/pdf_device.h
+index 2167a56..2ffe4b5 100644
+--- a/pdf/pdf_device.h
++++ b/pdf/pdf_device.h
+@@ -22,6 +22,7 @@ bool pdfi_device_check_param_exists(gx_device *dev, const char *param);
+ int pdfi_device_set_param_string(gx_device *dev, const char *paramname, const char *value);
+ int pdfi_device_set_param_bool(gx_device *dev, const char *param, bool value);
+ int pdfi_device_set_param_float(gx_device *dev, const char *param, float value);
++int pdfi_device_set_image_qfactor(gx_device *dev, int color_pct, int gray_pct);
+ void pdfi_device_set_flags(pdf_context *ctx);
+ int pdfi_device_misc_config(pdf_context *ctx);
+ 
+diff --git a/pdf/pdftop.c b/pdf/pdftop.c
+index 8d2f020..465fede 100644
+--- a/pdf/pdftop.c
++++ b/pdf/pdftop.c
+@@ -128,6 +128,8 @@ pdf_impl_allocate_interp_instance(pl_interp_implementation_t *impl,
+     }
+ 
+     ctx->finish_page = pdf_impl_finish_page;
++    ctx->args.color_qfactor_pct = 0;
++    ctx->args.gray_qfactor_pct = 0;
+ 
+     ctx->instance = instance;
+     instance->ctx = ctx;
+@@ -737,6 +739,16 @@ pdf_impl_set_param(pl_interp_implementation_t *impl,
+             if (code < 0)
+                 return code;
+         }
++        if (argis(param, "ColorImageQFactorPct")) {
++            code = plist_value_get_int(&pvalue, &ctx->args.color_qfactor_pct);
++            if (code < 0)
++                return code;
++        }
++        if (argis(param, "GrayImageQFactorPct")) {
++            code = plist_value_get_int(&pvalue, &ctx->args.gray_qfactor_pct);
++            if (code < 0)
++                return code;
++        }
+         if (argis(param, "OutputFile")) {
+             if (!Printed_set)
+                 ctx->args.printed = true;
+@@ -773,6 +785,12 @@ pdf_impl_init_job(pl_interp_implementation_t *impl,
+     if (getenv("PDF_DISABLE_TRANSPARENCY"))
+         ctx->args.notransparency = true;
+ 
++    if (ctx->args.color_qfactor_pct > 0 || ctx->args.gray_qfactor_pct > 0) {
++        int code = pdfi_device_set_image_qfactor(device, ctx->args.color_qfactor_pct, ctx->args.gray_qfactor_pct);
++        if (code < 0)
++            return code;
++    }
++
+     return pdf_impl_set_device(impl, device);
+ }
+ 
